@@ -4,6 +4,7 @@ import multiprocessing
 from queue import Empty
 import json
 import time
+import keyboard
 import numpy as np
 from collections import OrderedDict
 from psychopy import visual, core, event
@@ -181,14 +182,12 @@ class StepExp:
         """
         Check for key presses, update the visual line amplitude
         """
-        key_response = event.getKeys(keyList=["left", "right", "escape"])
-        if key_response:
-            if "left" in key_response:
-                self.line_orientation -= self.line_ori_step_size
-            elif "right" in key_response:
-                self.line_orientation += self.line_ori_step_size
-            elif "escape" in key_response:
-                self.quit_exp()
+        if keyboard.is_pressed("left arrow"):
+            self.line_orientation -= self.line_ori_step_size
+        elif keyboard.is_pressed("right arrow"):
+            self.line_orientation += self.line_ori_step_size
+        elif keyboard.is_pressed("esc"):
+            self.quit_exp()
 
     def display_stimuli(self):
         """
@@ -263,16 +262,13 @@ class StepExp:
         Tell the participant to press the space bar to start the trial
         """
         self.triggers["startText"] = True
-        # flush old key events before starting to listen
-        event.clearEvents()
         while True:
             self.display_stimuli()
-            start_key = event.getKeys(keyList=["space", "escape"])
-            if "space" in start_key:
+            if keyboard.is_pressed("space"):
                 self.triggers["startText"] = False
                 self.display_stimuli()
                 break
-            elif "escape" in start_key:
+            elif keyboard.is_pressed("esc"):
                 self.quit_exp()
 
     def _format_data(self):
