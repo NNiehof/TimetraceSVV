@@ -1,0 +1,25 @@
+{
+	"rodStim": {
+		"stimType": "ImageStim",
+		"settings": {
+			"image": "longline.png"
+		}
+	},
+	"startText": {
+		"stimType": "TextStim",
+		"settings": {
+			"text": "press SPACE to start trial",
+			"height": 40.0,
+			"pos": [
+				0,
+				0
+			],
+			"color": [
+				-1.0,
+				-1.0,
+				-0.6
+			],
+			"units": "pix"
+		}
+	}
+}

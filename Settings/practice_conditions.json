@@ -1,0 +1,17 @@
+{
+  "current_mA": [
+    1.5
+  ],
+  "frequency": [
+    1.0
+  ],
+  "line_offset": [
+    -45.0,
+    0.0,
+    90.0
+  ],
+  "line_amplitude": [
+    1.0,
+    5.0
+  ]
+}

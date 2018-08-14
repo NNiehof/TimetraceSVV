@@ -1,0 +1,178 @@
+# Nynke Niehof, 2018
+
+import numpy as np
+import nidaqmx
+from nidaqmx import constants, stream_writers
+import time
+import logging
+
+
+class GVS(object):
+    """
+    Represents a GVS object that communicates with the NIDAQ digital-to-analog
+    converter, which sends signals to the Biopac STMISOLA stimulator.
+    """
+    def __init__(self, max_voltage=3.0, logger=None):
+        """
+        Create a GVS communication object.
+
+        :param max_voltage: maximum voltage the NIDAQ should generate.
+        Note: this translates to a maximum current (with 1 V corresponding to
+        1 mA) when the Biopac STMISOLA is in current mode (I). Depending on the
+        impedance between the electrodes on the participant's head, the
+        generated voltage can vary as V = I * R.
+
+        :param logger: (optional) logging object.
+        If undefined, log messages will be sent to the console.
+        """
+        self.max_voltage = abs(max_voltage)
+        self.multiple_channels = False
+        self.n_channels = 0
+
+        # create a task, initialise stream writer
+        self.task = nidaqmx.Task()
+        self.writer = None
+
+        # set up logger
+        if logger is not None:
+            self.logger = logger
+        else:
+            logging.basicConfig(level=logging.DEBUG,
+                                format="%(asctime)s %(message)s")
+            self.logger = logging.getLogger()
+
+    def connect(self, physical_channel_name, **timing_args):
+        """
+        Establish connection with NIDAQ apparatus. A virtual output channel
+        and data stream writer are created.
+
+        :param physical_channel_name: (str or list of str) name of output
+        port on NIDAQ (to see available channel names, open NI MAX
+        (software included with driver installation) and look under
+        "Devices and Interfaces").
+        The name might look something like "cDAQ1Mod1/ao0".
+        **timing_args : keyword arguments from
+        nidqamx.task.timing.cfg_samp_clk_timing.
+        :return: True if connection was successful, otherwise False.
+        """
+        # check for multiple channels
+        if isinstance(physical_channel_name, str):
+            self.multiple_channels = False
+            self.n_channels = 1
+        elif isinstance(physical_channel_name, list):
+            self.multiple_channels = True
+            self.n_channels = len(physical_channel_name)
+        else:
+            self.logger.error("GVS.connect: please specify a valid "
+                              "physical channel name.")
+
+        try:
+            if self.multiple_channels:
+                # connect multiple analog output channels
+                for chan_name in physical_channel_name:
+                    self.add_ao_channel(chan_name)
+                # config timing
+                if "rate" not in timing_args:
+                    rate = 1e3
+                    self.task.timing.cfg_samp_clk_timing(rate, **timing_args)
+                else:
+                    self.task.timing.cfg_samp_clk_timing(**timing_args)
+                # create output stream writer
+                self.writer = stream_writers.AnalogMultiChannelWriter(
+                    self.task.out_stream, auto_start=True
+                )
+            else:
+                # connect single analog output channel
+                self.add_ao_channel(physical_channel_name)
+                # config timing
+                if "rate" not in timing_args:
+                    rate = 1e3
+                    self.task.timing.cfg_samp_clk_timing(rate, **timing_args)
+                else:
+                    self.task.timing.cfg_samp_clk_timing(**timing_args)
+                # create output stream writer
+                self.writer = stream_writers.AnalogSingleChannelWriter(
+                    self.task.out_stream, auto_start=True
+                )
+
+            logging.info("GVS task and channel created")
+        except nidaqmx.errors.DaqError as err:
+            self.logger.error("DAQmx error: {0}".format(err))
+            return False
+
+        self.logger.info("GVS task started")
+        return True
+
+    @property
+    def max_voltage(self):
+        return self._max_voltage
+
+    @max_voltage.setter
+    def max_voltage(self, max_voltage):
+        if max_voltage > 3.0:
+            self._max_voltage = 3.0
+        else:
+            self._max_voltage = max_voltage
+
+    def add_ao_channel(self, physical_channel_name, assigned_name=""):
+        """
+        Create virtual voltage output channel.
+
+        :param physical_channel_name: name of output port on NIDAQ (to see
+        available channel names, open NI MAX (software included with driver
+        installation) and look under "Devices and Interfaces").
+        The name might look something like "cDAQ1Mod1/ao0".
+        :param assigned_name: (optional) name to assign to the channel.
+        """
+        self.task.ao_channels.add_ao_voltage_chan(
+            physical_channel_name,
+            name_to_assign_to_channel=assigned_name,
+            min_val=-self.max_voltage,
+            max_val=self.max_voltage,
+            units=constants.VoltageUnits.VOLTS
+        )
+
+    def write_to_channel(self, current_profile, reset_to_zero_volts=False):
+        """
+        Send a current profile to the output channel.
+
+        :param current_profile: Numpy array of samples
+        :param reset_to_zero_volts: (bool, optional)
+        Changes the final sample to 0 V, to set the excitation level of
+        the NIDAQ back to zero. Otherwise, the NIDAQ continues excitation
+        at the level of the final sample.
+        :return samps_written: number of samples successfully written
+        """
+        if reset_to_zero_volts and current_profile is not None:
+            # replace the final sample with zero to set the baseline back
+            current_profile[-1] = 0.0
+            self.logger.info("final current sample set to 0 V")
+
+        if self.multiple_channels:
+            assert(np.shape(current_profile)[0] == self.n_channels),\
+                "Number of rows in the data (numpy array) should equal" \
+                " the number of channels."
+
+        t_start = time.time()
+        samps_written = self.writer.write_many_sample(current_profile)
+        self.task.wait_until_done(timeout=nidaqmx.constants.WAIT_INFINITELY)
+        t_stop = time.time()
+        self.task.stop()
+
+        self.logger.debug("{0} start GVS".format(t_start))
+        self.logger.debug("{0} stop GVS".format(t_stop))
+        self.logger.info("GVS duration = {0}".format(t_stop - t_start))
+
+        assert isinstance(samps_written, int)
+        return samps_written
+
+    def quit(self):
+        self.task.stop()
+        self.task.close()
+        self.logger.info("GVS task closed")
+        return True
+
+
+if __name__ == "__main__":
+    gvs = GVS(max_voltage=1.0)
+    gvs.quit()
