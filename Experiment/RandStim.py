@@ -4,7 +4,7 @@ import numpy as np
 
 class RandStim:
 
-    def __init__(self, current_mA=None, line_offset=None):
+    def __init__(self, current_mA=None, line_offset=None, frame_angles=None):
         """
         Object that creates a randomised list of trials, out of a range of
         stimulus values and conditions.
@@ -12,7 +12,12 @@ class RandStim:
         self.trial_list = []
         for curr in current_mA:
             for line_mu in line_offset:
-                self.trial_list.append([curr, line_mu])
+                # add conditions with a visual frame and 2 mA current
+                if curr == 2.0:
+                    for frame in frame_angles:
+                        self.trial_list.append([curr, line_mu, frame])
+                else:
+                    self.trial_list.append([curr, line_mu, None])
         shuffle(self.trial_list)
 
     def get_stimulus(self, trial_nr):
