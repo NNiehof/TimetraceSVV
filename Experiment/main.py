@@ -6,6 +6,7 @@ import json
 import time
 import keyboard
 import numpy as np
+from random import random
 from collections import OrderedDict
 from psychopy import visual, core, event
 from Experiment.GVSHandler import GVSHandler
@@ -32,14 +33,17 @@ class StepExp:
         self.condition = condition
         self.f_sampling = 1e3
         self.screen_refresh_freq = 60
-        self.duration_s = 13.0
+        self.duration_s = 15.25
+        self.visual_only_duration_s = 14.75
         self.visual_soa = None
         self.current_mA = 1.0
         self.physical_channel_name = "cDAQ1Mod1/ao0"
         self.line_ori_step_size = 0.25
+        self.line_drift_step_size = 0.1
         self.oled_delay = 0.05
-        self.header = "trial_nr; current; line_offset; line_ori\n"
-        self.ramp_duration_s = 1.5
+        self.header = "trial_nr; current; line_offset; gvs_start; gvs_end;" \
+                      " line_drift; line_ori; frame_time\n"
+        self.ramp_duration_s = 0.25
 
         # longer practice trials
         if "practice" in self.condition:
@@ -53,6 +57,8 @@ class StepExp:
         self.triggers = None
         self.gvs_profile = None
         self.gvs_sent = None
+        self.gvs_start = None
+        self.gvs_end = None
         self.visual_duration = self.duration_s - (2 * self.ramp_duration_s)
         self.visual_time = np.arange(0, self.visual_duration,
                                      1.0 / self.screen_refresh_freq)
@@ -178,6 +184,18 @@ class StepExp:
             if not blocking:
                 return None
 
+    def random_walk(self):
+        """
+        Random walk drift of visual line orientation.
+        :return line_drift:
+        """
+        if random() < 0.5:
+            line_drift = -self.line_drift_step_size
+        else:
+            line_drift = self.line_drift_step_size
+        self.line_orientation += line_drift
+        return line_drift
+
     def check_response(self):
         """
         Check for key presses, update the visual line amplitude
@@ -206,13 +224,21 @@ class StepExp:
         line_start = time.time()
 
         for frame in self.visual_time:
+            # random drift of line
+            drift = self.random_walk()
+            self.line_drift.append(drift)
+
             self.stimuli["rodStim"].setOri(self.line_orientation)
-            # save current line orientation in list
+            # save current line orientation and time
             self.line_ori.append(self.line_orientation)
+            self.frame_times.append(time.time())
             # show stimulus on screen
             self.display_stimuli()
             self.frame_times.append(time.time())
             self.check_response()
+            # get end time of GVS
+            if self.gvs_end is None:
+                self.gvs_end = self._check_gvs_status("t_end_gvs", blocking=False)
 
         # log visual stimulus times
         line_end = time.time()
@@ -230,9 +256,12 @@ class StepExp:
         """
         self.logger_main.debug("initialising trial {}".format(self.trial_nr))
         trial = self.trials.get_stimulus(self.trial_nr)
+        self.gvs_start = None
+        self.gvs_end = None
         # lists for saving the measured data
         self.line_ori = []
         self.frame_times = []
+        self.line_drift = []
 
         # trial parameters
         self.current_mA = trial[0]
@@ -272,8 +301,10 @@ class StepExp:
                 self.quit_exp()
 
     def _format_data(self):
-        formatted_data = "{}; {}; {}; {}\n".format(
-            self.trial_nr, self.current_mA, self.line_offset, self.line_ori)
+        formatted_data = "{}; {}; {}; {}; {}; {}; {}; {}\n".format(
+            self.trial_nr, self.current_mA, self.line_offset,
+            self.gvs_start, self.gvs_end, self.line_drift, self.line_ori,
+            self.frame_times)
         return formatted_data
 
     def run(self):
@@ -291,21 +322,13 @@ class StepExp:
             self.param_queue.put(True)
 
             # get onset time of GVS
-            gvs_start = self._check_gvs_status("t_start_gvs")
-            while True:
-                if (time.time() - gvs_start) > self.visual_onset_delay:
-                    break
+            self.gvs_start = self._check_gvs_status("t_start_gvs")
 
-            # clear old key events
-            event.clearEvents()
             # draw visual line
             self.show_visual()
 
             # save data to file
             self.save_data.write(self._format_data())
-
-            # get end time of GVS (blocks until GVS is finished)
-            gvs_end = self._check_gvs_status("stim_sent")
 
             # self.stimulus_plot(self.visual_time, self.line_ori)
             # self.stimulus_plot(self.gvs_time, self.gvs_wave)
@@ -453,7 +476,7 @@ class Stimuli:
 
 
 if __name__ == "__main__":
-    exp = StepExp(sj=4, condition="zero-one-two-headtilted")
+    exp = StepExp(sj=99, condition="test")
     exp.setup()
     exp.run()
     exp.quit_exp()

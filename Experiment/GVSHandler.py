@@ -125,7 +125,9 @@ class GVSHandler:
                 t_start_gvs = time.time()
                 self.status_queue.put({"t_start_gvs": t_start_gvs})
                 samps_written = self.gvs.write_to_channel(self.stimulus,
-                                                          reset_to_zero_volts=False)
+                                                          reset_to_zero_volts=True)
+                t_end_gvs = time.time()
+
                 if self.stimulus.ndim == 1:
                     n_samples = len(self.stimulus)
                 else:
@@ -141,5 +143,7 @@ class GVSHandler:
 
         if n_samples == samps_written:
             self.status_queue.put({"stim_sent": True})
+            self.status_queue.put({"t_end_gvs": t_end_gvs})
         else:
             self.status_queue.put({"stim_sent": False})
+            self.status_queue.put({"t_end_gvs": time.time()})
