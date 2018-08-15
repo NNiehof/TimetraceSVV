@@ -26,6 +26,7 @@ class StepExp:
     def __init__(self, sj=None, condition=""):
 
         self.debug = True
+        self.use_global_logger = False
 
         # experiment settings and conditions
         self.sj = sj
@@ -33,13 +34,13 @@ class StepExp:
         self.condition = condition
         self.f_sampling = 1e3
         self.screen_refresh_freq = 60
-        self.duration_s = 2 # 15.25
-        self.visual_only_duration_s = 2# 14.75
+        self.duration_s = 15.25
+        self.visual_only_duration_s = 14.75
         self.visual_soa = None
         self.current_mA = 1.0
         self.physical_channel_name = "cDAQ1Mod1/ao0"
-        self.line_ori_step_size = 0.25
-        self.line_drift_step_size = 0.1
+        self.line_ori_step_size = 0.1
+        self.line_drift_step_size = 0.025
         self.oled_delay = 0.05
         self.header = "trial_nr; current; line_offset; frame_ori; gvs_start;" \
                       " gvs_end; line_drift; line_ori; frame_time\n"
@@ -51,6 +52,8 @@ class StepExp:
 
         # initialise
         self.make_stim = None
+        self.drift = 0.0
+        self.frame_counter = 0
         self.stimuli = None
         self.conditions = None
         self.trials = None
@@ -70,7 +73,7 @@ class StepExp:
 
         # root directory
         abs_path = os.path.abspath("__file__")
-        self.root_dir = os.path.dirname(os.path.dirname(abs_path))
+        self.root_dir = os.path.dirname(abs_path)
         self.settings_dir = "{}/Settings".format(self.root_dir)
 
     def setup(self):
@@ -83,9 +86,16 @@ class StepExp:
                             root_dir=self.root_dir)
         log_name = make_log.datafile
         self._logger_setup(log_name)
+
         main_worker = Worker(self.log_queue, self.log_formatter,
                              self.default_logging_level, "main")
         self.logger_main = main_worker.logger
+
+        if not self.use_global_logger:
+            logging.basicConfig(level=logging.DEBUG,
+                                format="%(asctime)s %(message)s")
+            self.logger_main = logging.getLogger()
+
         self.logger_main.debug("logger set up")
 
         # set up connection with galvanic stimulator
@@ -147,7 +157,8 @@ class StepExp:
         # will cause pipe breakage in case of a bug elsewhere in the code,
         # and the console will be flooded with error messages from the
         # listener.
-        self.log_listener.start()
+        if self.use_global_logger:
+            self.log_listener.start()
 
     def _gvs_setup(self):
         """
@@ -190,10 +201,13 @@ class StepExp:
         Random walk drift of visual line orientation.
         :return line_drift:
         """
-        if random() < 0.5:
-            line_drift = -self.line_drift_step_size
+        if self.frame_counter == 0:
+            if random() < 0.5:
+                line_drift = -self.line_drift_step_size
+            else:
+                line_drift = self.line_drift_step_size
         else:
-            line_drift = self.line_drift_step_size
+            line_drift = self.drift
         self.line_orientation += line_drift
         return line_drift
 
@@ -229,8 +243,11 @@ class StepExp:
 
         for frame in self.visual_time:
             # random drift of line
-            drift = self.random_walk()
-            self.line_drift.append(drift)
+            self.drift = self.random_walk()
+            self.line_drift.append(self.drift)
+            self.frame_counter += 1
+            if self.frame_counter == 150:
+                self.frame_counter = 0
 
             self.stimuli["rodStim"].setOri(self.line_orientation)
             # save current line orientation and time
@@ -337,7 +354,7 @@ class StepExp:
             self.save_data.write(self._format_data())
 
             # self.stimulus_plot(self.visual_time, self.line_ori)
-            # self.stimulus_plot(self.gvs_time, self.gvs_wave)
+            # self.stimulus_plot(xvals=None, stim=self.gvs_profile)
             # self.quit_exp()
 
         self.quit_exp()
@@ -367,8 +384,9 @@ class StepExp:
                 break
         # stop GVS and logging processes
         self.gvs_process.join()
-        self.log_queue.put(None)
-        self.log_listener.join()
+        if self.use_global_logger:
+            self.log_queue.put(None)
+            self.log_listener.join()
 
         # close psychopy window and the program
         self.win.close()
