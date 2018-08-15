@@ -33,16 +33,16 @@ class StepExp:
         self.condition = condition
         self.f_sampling = 1e3
         self.screen_refresh_freq = 60
-        self.duration_s = 15.25
-        self.visual_only_duration_s = 14.75
+        self.duration_s = 2 # 15.25
+        self.visual_only_duration_s = 2# 14.75
         self.visual_soa = None
         self.current_mA = 1.0
         self.physical_channel_name = "cDAQ1Mod1/ao0"
         self.line_ori_step_size = 0.25
         self.line_drift_step_size = 0.1
         self.oled_delay = 0.05
-        self.header = "trial_nr; current; line_offset; gvs_start; gvs_end;" \
-                      " line_drift; line_ori; frame_time\n"
+        self.header = "trial_nr; current; line_offset; frame_ori; gvs_start;" \
+                      " gvs_end; line_drift; line_ori; frame_time\n"
         self.ramp_duration_s = 0.25
 
         # longer practice trials
@@ -63,6 +63,7 @@ class StepExp:
         self.visual_time = np.arange(0, self.visual_duration,
                                      1.0 / self.screen_refresh_freq)
         self.line_orientation = 0.0
+        self.frame_ori = None
         self.line_angle = None
         self.visual_onset_delay = self.ramp_duration_s
         self.trial_nr = 0
@@ -221,6 +222,9 @@ class StepExp:
         Visual loop that draws the stimuli on screen
         """
         self.triggers["rodStim"] = True
+        if self.frame_ori is not None:
+            self.triggers["squareFrame"] = True
+            self.stimuli["squareFrame"].setOri(self.frame_ori)
         line_start = time.time()
 
         for frame in self.visual_time:
@@ -248,6 +252,7 @@ class StepExp:
             line_end - line_start))
 
         self.triggers["rodStim"] = False
+        self.triggers["squareFrame"] = False
         self.display_stimuli()
 
     def init_trial(self):
@@ -266,6 +271,7 @@ class StepExp:
         # trial parameters
         self.current_mA = trial[0]
         self.line_offset = trial[1]
+        self.frame_ori = trial[2]
         self.line_orientation = self.line_offset
 
         # stimulus asynchrony: start visual after GVS has ramped up
@@ -301,8 +307,8 @@ class StepExp:
                 self.quit_exp()
 
     def _format_data(self):
-        formatted_data = "{}; {}; {}; {}; {}; {}; {}; {}\n".format(
-            self.trial_nr, self.current_mA, self.line_offset,
+        formatted_data = "{}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(
+            self.trial_nr, self.current_mA, self.line_offset, self.frame_ori,
             self.gvs_start, self.gvs_end, self.line_drift, self.line_ori,
             self.frame_times)
         return formatted_data
