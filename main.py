@@ -34,21 +34,20 @@ class StepExp:
         self.condition = condition
         self.f_sampling = 1e3
         self.screen_refresh_freq = 60
-        self.duration_s = 15.25
+        self.baseline_duration_s = 10.0
+        self.gvs_duration_s = 15.25
         self.visual_only_duration_s = 14.75
-        self.visual_soa = None
         self.current_mA = 1.0
         self.physical_channel_name = "cDAQ1Mod1/ao0"
         self.line_ori_step_size = 0.1
         self.line_drift_step_size = 0.025
-        self.oled_delay = 0.05
         self.header = "trial_nr; current; line_offset; frame_ori; gvs_start;" \
                       " gvs_end; line_drift; line_ori; frame_time\n"
         self.ramp_duration_s = 0.25
 
         # longer practice trials
         if "practice" in self.condition:
-            self.duration_s = 17.0
+            self.gvs_duration_s = 17.0
 
         # initialise
         self.make_stim = None
@@ -62,13 +61,14 @@ class StepExp:
         self.gvs_sent = None
         self.gvs_start = None
         self.gvs_end = None
-        self.visual_duration = self.duration_s - (2 * self.ramp_duration_s)
+        self.visual_duration =\
+            self.baseline_duration_s + self.visual_only_duration_s +\
+            self.gvs_duration_s
         self.visual_time = np.arange(0, self.visual_duration,
                                      1.0 / self.screen_refresh_freq)
         self.line_orientation = 0.0
         self.frame_ori = None
         self.line_angle = None
-        self.visual_onset_delay = self.ramp_duration_s
         self.trial_nr = 0
 
         # root directory
@@ -164,7 +164,7 @@ class StepExp:
         """
         Establish connection with galvanic stimulator
         """
-        buffer_size = int(self.duration_s * self.f_sampling) + 1
+        buffer_size = int(self.gvs_duration_s * self.f_sampling) + 1
         self.param_queue = multiprocessing.Queue()
         self.status_queue = multiprocessing.Queue()
         self.gvs_process = multiprocessing.Process(target=GVSHandler,
@@ -240,6 +240,11 @@ class StepExp:
             self.triggers["squareFrame"] = True
             self.stimuli["squareFrame"].setOri(self.frame_ori)
         line_start = time.time()
+        gvs_not_yet_sent = True
+
+        # check where the timing goes wrong
+        last_frame = line_start
+        current_frame = None
 
         for frame in self.visual_time:
             # random drift of line
@@ -249,6 +254,16 @@ class StepExp:
             if self.frame_counter == 150:
                 self.frame_counter = 0
 
+            # start GVS after the baseline period
+            # (should actually not be started in the visual loop,
+            # but this just needs to work quickly)
+            if (
+                    (time.time() - line_start) >= self.baseline_duration_s and \
+                    gvs_not_yet_sent):
+                # send the GVS signal to the stimulator
+                self.param_queue.put(True)
+                gvs_not_yet_sent = False
+
             self.stimuli["rodStim"].setOri(self.line_orientation)
             # save current line orientation and time
             self.line_ori.append(self.line_orientation)
@@ -257,9 +272,17 @@ class StepExp:
             self.display_stimuli()
             self.frame_times.append(time.time())
             self.check_response()
+            # get start time of GVS
+            if self.gvs_start is None:
+                self.gvs_start = self._check_gvs_status("t_start_gvs", blocking=False)
             # get end time of GVS
             if self.gvs_end is None:
                 self.gvs_end = self._check_gvs_status("t_end_gvs", blocking=False)
+
+            # check frame duration
+            current_frame = time.time()
+            print(current_frame - last_frame)
+            last_frame = current_frame
 
         # log visual stimulus times
         line_end = time.time()
@@ -291,12 +314,8 @@ class StepExp:
         self.frame_ori = trial[2]
         self.line_orientation = self.line_offset
 
-        # stimulus asynchrony: start visual after GVS has ramped up
-        self.visual_soa = self.ramp_duration_s
-        self.visual_onset_delay = self.visual_soa - self.oled_delay
-
         # create GVS profile
-        self.gvs_create.step(self.duration_s, self.current_mA)
+        self.gvs_create.step(self.gvs_duration_s, self.current_mA)
         self.gvs_create.fade(self.f_sampling * self.ramp_duration_s)
         self.gvs_profile = self.gvs_create.stim
 
@@ -340,12 +359,6 @@ class StepExp:
 
             # wait for space bar press to start trial
             self.wait_start()
-
-            # send the GVS signal to the stimulator
-            self.param_queue.put(True)
-
-            # get onset time of GVS
-            self.gvs_start = self._check_gvs_status("t_start_gvs")
 
             # draw visual line
             self.show_visual()
