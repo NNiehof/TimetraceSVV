@@ -4,6 +4,11 @@ import scipy.io
 import os.path
 import pickle
 
+"""
+Read in txt files with StepGVS data, convert to
+dataframe (parameters) and numpy arrays (measurements)
+and save to Matlab file and to pickle.
+"""
 
 # read in data
 data_folder = "D:/OneDrive/Code/TimetraceSVV/Data/001/"
@@ -43,7 +48,8 @@ df = df.drop(columns=["line_drift", "line_ori", "frame_time"])
 f_name = "sj{0}_data.mat".format(sj)
 scipy.io.savemat(f_name,
                  {"df": df.to_dict("list"), "drift": drift,
-                  "line_ori": line_ori, "timestamp": timestamp})
+                  "line_ori": line_ori, "timestamp": timestamp},
+                 oned_as="column")
 
 # save to pickle
 p_name = "sj{0}_data.pickle".format(sj)
