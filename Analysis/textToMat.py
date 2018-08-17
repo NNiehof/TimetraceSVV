@@ -45,14 +45,16 @@ for index, row in df.iterrows():
 df = df.drop(columns=["line_drift", "line_ori", "frame_time"])
 
 # save to .mat file
-f_name = "sj{0}_data.mat".format(sj)
+f_name = "{0}sj{1}_data.mat".format(data_folder, sj)
 scipy.io.savemat(f_name,
                  {"df": df.to_dict("list"), "drift": drift,
                   "line_ori": line_ori, "timestamp": timestamp},
                  oned_as="column")
 
 # save to pickle
-p_name = "sj{0}_data.pickle".format(sj)
+p_name = "{0}sj{1}_data.pickle".format(data_folder, sj)
 with open(p_name, "wb") as f:
-    pickle.dump({"df": df, "drift": drift, "line_ori": line_ori,
-                 "timestamp": timestamp}, f)
+    pickle.dump(df, f)
+    pickle.dump(drift, f)
+    pickle.dump(line_ori, f)
+    pickle.dump(timestamp, f)
