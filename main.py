@@ -13,6 +13,7 @@ from Experiment.GVSHandler import GVSHandler
 from Experiment.loggingConfig import Listener, Worker
 from Experiment.RandStim import RandStim
 from Experiment.GenStim import GenStim
+from Experiment.filteredNoise import Drift
 
 """
 Present constant (step) GVS with a visual line presented at a random start
@@ -35,15 +36,15 @@ class StepExp:
         self.f_sampling = 1e3
         self.screen_refresh_freq = 60
         self.baseline_duration_s = 10.0
-        self.gvs_duration_s = 15.25
-        self.visual_only_duration_s = 14.75
+        self.gvs_duration_s = 17.0
+        self.visual_only_duration_s = 15.0
         self.current_mA = 1.0
         self.physical_channel_name = "cDAQ1Mod1/ao0"
         self.line_ori_step_size = 0.1
         self.line_drift_step_size = 0.025
         self.header = "trial_nr; current; line_offset; frame_ori; gvs_start;" \
                       " gvs_end; line_drift; line_ori; frame_time\n"
-        self.ramp_duration_s = 0.25
+        self.ramp_duration_s = 1.0
 
         # longer practice trials
         if "practice" in self.condition:
@@ -117,6 +118,9 @@ class StepExp:
         self.make_stim = Stimuli(self.win, self.settings_dir, self.n_trials)
         self.stimuli, self.triggers = self.make_stim.create()
         self.gvs_create = GenStim(f_samp=self.f_sampling)
+        # random drift generator for the visual line
+        self.random_drift = Drift(mu=0, sigma=10.0,
+                                  f_sampling=self.screen_refresh_freq)
 
         # data save file
         self.save_data = SaveData(self.sj, self.paradigm, self.condition,
@@ -246,13 +250,9 @@ class StepExp:
         last_frame = line_start
         current_frame = None
 
-        for frame in self.visual_time:
+        for frame, drift in zip(self.visual_time, self.line_drift):
             # random drift of line
-            self.drift = self.random_walk()
-            self.line_drift.append(self.drift)
-            self.frame_counter += 1
-            if self.frame_counter == 150:
-                self.frame_counter = 0
+            self.line_orientation += drift
 
             # start GVS after the baseline period
             # (should actually not be started in the visual loop,
@@ -280,9 +280,9 @@ class StepExp:
                 self.gvs_end = self._check_gvs_status("t_end_gvs", blocking=False)
 
             # check frame duration
-            current_frame = time.time()
-            print(current_frame - last_frame)
-            last_frame = current_frame
+            # current_frame = time.time()
+            # print(current_frame - last_frame)
+            # last_frame = current_frame
 
         # log visual stimulus times
         line_end = time.time()
@@ -306,7 +306,13 @@ class StepExp:
         # lists for saving the measured data
         self.line_ori = []
         self.frame_times = []
+        # get random orientation for the line, take rate of change
+        random_ori = self.random_drift.lowpass_filter(
+            n_samples=(len(self.visual_time) + 1), cutoff=0.2)
         self.line_drift = []
+        index = range(len(random_ori))
+        for samp in index:
+            self.line_drift.append((random_ori[samp] - random_ori[samp - 1]) / 6)
 
         # trial parameters
         self.current_mA = trial[0]

@@ -56,4 +56,9 @@ if __name__ == "__main__":
     stimulus_plot(xvals=None, stim=signal,
                   title="filter cutoff = 0.2 Hz,"
                         " {}th order Butterworth".format(butter_order))
+    diff_signal = [0]
+    index = range(1, len(signal))
+    for samp in index:
+        diff_signal.append(signal[samp] - signal[samp - 1])
+    stimulus_plot(xvals=None, stim=diff_signal)
     plt.show()
