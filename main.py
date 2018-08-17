@@ -258,7 +258,7 @@ class StepExp:
             # (should actually not be started in the visual loop,
             # but this just needs to work quickly)
             if (
-                    (time.time() - line_start) >= self.baseline_duration_s and \
+                    (time.time() - line_start) >= self.baseline_duration_s and
                     gvs_not_yet_sent):
                 # send the GVS signal to the stimulator
                 self.param_queue.put(True)
@@ -267,7 +267,6 @@ class StepExp:
             self.stimuli["rodStim"].setOri(self.line_orientation)
             # save current line orientation and time
             self.line_ori.append(self.line_orientation)
-            self.frame_times.append(time.time())
             # show stimulus on screen
             self.display_stimuli()
             self.frame_times.append(time.time())
@@ -519,7 +518,7 @@ class Stimuli:
 
 
 if __name__ == "__main__":
-    exp = StepExp(sj=99, condition="test")
+    exp = StepExp(sj=2, condition="exp")
     exp.setup()
     exp.run()
     exp.quit_exp()
