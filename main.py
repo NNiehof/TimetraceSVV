@@ -42,7 +42,7 @@ class StepExp:
         self.physical_channel_name = "cDAQ1Mod1/ao0"
         self.line_ori_step_size = 0.1
         self.line_drift_step_size = 0.025
-        self.header = "trial_nr; current; line_offset; frame_ori; gvs_start;" \
+        self.header = "trial_nr; current; line_offset; dots_rotation; gvs_start;" \
                       " gvs_end; line_drift; line_ori; frame_time\n"
         self.ramp_duration_s = 1.0
 
@@ -68,7 +68,7 @@ class StepExp:
         self.visual_time = np.arange(0, self.visual_duration,
                                      1.0 / self.screen_refresh_freq)
         self.line_orientation = 0.0
-        self.frame_ori = None
+        self.dots_rotation = None
         self.line_angle = None
         self.trial_nr = 0
 
@@ -240,19 +240,25 @@ class StepExp:
         Visual loop that draws the stimuli on screen
         """
         self.triggers["rodStim"] = True
-        if self.frame_ori is not None:
-            self.triggers["squareFrame"] = True
-            self.stimuli["squareFrame"].setOri(self.frame_ori)
+        if self.dots_rotation is not None:
+            self.triggers["dots"] = True
+            self.triggers["circlePatch"] = True
         line_start = time.time()
         gvs_not_yet_sent = True
 
-        # check where the timing goes wrong
+        # check the timing
         last_frame = line_start
         current_frame = None
 
         for frame, drift in zip(self.visual_time, self.line_drift):
             # random drift of line
             self.line_orientation += drift
+
+            # rotate the dots patch at a specified angular velocity
+            # per second, starting at time *line_start*
+            if self.dots_rotation is not None:
+                self.stimuli["dots"].setOri(
+                    self.dots_rotation * round(time.time() - line_start, ndigits=3))
 
             # start GVS after the baseline period
             # (should actually not be started in the visual loop,
@@ -291,7 +297,8 @@ class StepExp:
             line_end - line_start))
 
         self.triggers["rodStim"] = False
-        self.triggers["squareFrame"] = False
+        self.triggers["dots"] = False
+        self.triggers["circlePatch"] = False
         self.display_stimuli()
 
     def init_trial(self):
@@ -316,7 +323,7 @@ class StepExp:
         # trial parameters
         self.current_mA = trial[0]
         self.line_offset = trial[1]
-        self.frame_ori = trial[2]
+        self.dots_rotation = trial[2]
         self.line_orientation = self.line_offset
 
         # create GVS profile
@@ -349,7 +356,7 @@ class StepExp:
 
     def _format_data(self):
         formatted_data = "{}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(
-            self.trial_nr, self.current_mA, self.line_offset, self.frame_ori,
+            self.trial_nr, self.current_mA, self.line_offset, self.dots_rotation,
             self.gvs_start, self.gvs_end, self.line_drift, self.line_ori,
             self.frame_times)
         return formatted_data
@@ -518,7 +525,7 @@ class Stimuli:
 
 
 if __name__ == "__main__":
-    exp = StepExp(sj=2, condition="exp")
+    exp = StepExp(sj=99, condition="test")
     exp.setup()
     exp.run()
     exp.quit_exp()
