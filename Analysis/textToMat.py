@@ -11,8 +11,8 @@ and save to Matlab file and to pickle.
 """
 
 # read in data
-data_folder = "D:/OneDrive/Code/TimetraceSVV/Data/001/"
-data_file = data_folder + "001_stepGVS_exp_20180817_120206.txt"
+data_folder = "D:/OneDrive/Code/TimetraceSVV/Data/002/"
+data_file = data_folder + "002_stepGVS_exp_20180820_104324.txt"
 df = pd.read_csv(data_file, sep="; ", engine="python")
 sj = os.path.basename(os.path.normpath(data_folder))
 
