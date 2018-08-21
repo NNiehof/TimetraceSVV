@@ -1,67 +1,84 @@
 {
-	"dots": {
-		"stimType": "DotStim",
-		"settings": {
-			"nDots": 500,
-			"coherence": 1,
-			"fieldSize": 1060,
-			"fieldShape": "circle",
-			"dotSize": 2.0,
-			"dotLife": 100.0,
-			"speed": 0,
-			"color": [
-				-0.8,
-				-0.8,
-				-0.8
-			],
-			"signalDots": "same",
-			"noiseDots": "direction",
-			"units": "pix"
-		}
-	},
-	"circlePatch": {
-		"stimType": "Circle",
-		"settings": {
-			"radius": 240.0,
-			"pos": [
-				0,
-				0
-			],
-			"lineWidth": 1,
-			"lineColor": [
-				-1,
-				-1,
-				-1
-			],
-			"fillColor": [
-				-1,
-				-1,
-				-1
-			],
-			"units": "pix"
-		}
-	},
-	"rodStim": {
-		"stimType": "ImageStim",
-		"settings": {
-			"image": "linestim.png"
-		}
-	},
-	"startText": {
-		"stimType": "TextStim",
-		"settings": {
-			"text": "press SPACE to start trial",
-			"height": 40.0,
-			"pos": [
-				0,
-				0
-			],
-			"color": [
-				-1.0,
-				-1.0,
-				-0.6
-			],
-			"units": "pix"
-		}
-	}
+  "dots": {
+    "stimType": "DotStim",
+    "settings": {
+      "nDots": 500,
+      "coherence": 1,
+      "fieldSize": 1060,
+      "fieldShape": "circle",
+      "dotSize": 2.0,
+      "dotLife": 100.0,
+      "speed": 0,
+      "color": [
+        -0.8,
+        -0.8,
+        -0.8
+      ],
+      "signalDots": "same",
+      "noiseDots": "direction",
+      "units": "pix"
+    }
+  },
+  "circlePatch": {
+    "stimType": "Circle",
+    "settings": {
+      "radius": 240.0,
+      "pos": [
+        0,
+        0
+      ],
+      "lineWidth": 1,
+      "lineColor": [
+        -1,
+        -1,
+        -1
+      ],
+      "fillColor": [
+        -1,
+        -1,
+        -1
+      ],
+      "units": "pix"
+    }
+  },
+  "rodStim": {
+    "stimType": "ImageStim",
+    "settings": {
+      "image": "longline.png"
+    }
+  },
+  "startScreen": {
+    "stimType": "Rect",
+    "settings": {
+      "width": 1920,
+      "height": 1080,
+      "lineColor": [
+        -0.8,
+        -0.8,
+        -0.8
+      ],
+      "fillColor": [
+        -0.8,
+        -0.8,
+        -0.8
+      ]
+    }
+  },
+  "startText": {
+    "stimType": "TextStim",
+    "settings": {
+      "text": "press SPACE to start trial",
+      "height": 40.0,
+      "pos": [
+        0,
+        0
+      ],
+      "color": [
+        -1.0,
+        -1.0,
+        -0.6
+      ],
+      "units": "pix"
+    }
+  }
 }

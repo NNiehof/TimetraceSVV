@@ -344,11 +344,13 @@ class StepExp:
         """
         Tell the participant to press the space bar to start the trial
         """
+        self.triggers["startScreen"] = True
         self.triggers["startText"] = True
         while True:
             self.display_stimuli()
             if keyboard.is_pressed("space"):
                 self.triggers["startText"] = False
+                self.triggers["startScreen"] = False
                 self.display_stimuli()
                 break
             elif keyboard.is_pressed("esc"):
@@ -525,7 +527,7 @@ class Stimuli:
 
 
 if __name__ == "__main__":
-    exp = StepExp(sj=99, condition="test")
+    exp = StepExp(sj=3, condition="gvs-100cm")
     exp.setup()
     exp.run()
     exp.quit_exp()
